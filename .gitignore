@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-ssr/
+# docs/ is intentionally tracked — it's the pre-built GitHub Pages output
 *.local
 .env
 .env.*
