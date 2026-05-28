@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base reset ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #0A0E1A;
+  color: #F1F5F9;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent pull-to-refresh interfering with scroll */
+  overscroll-behavior: none;
+}
+
+/* ── Number alignment in monospace ── */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Custom scrollbar ── */
+::-webkit-scrollbar       { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2A3547; border-radius: 2px; }
+
+/* ── Tap highlight ── */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Warning glow pulse (matches tailwind config keyframes) ── */
+@keyframes warningGlow {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.15),
+                inset 0 0 0 1px rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.35),
+                inset 0 0 0 1px rgba(245, 158, 11, 0.7);
+  }
+}
