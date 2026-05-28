@@ -86,9 +86,9 @@ export const useGameStore = create<GameStore>()(
             {
               id: 'intro',
               type: 'intro',
-              title: 'Year 2025. Humanity needs a ladder.',
-              subtitle: 'The Space Elevator Programme — Phase 0: The Launchpad Problem',
-              body: 'Rocket launches cost $2,000–$10,000 per kilogram to low Earth orbit. To build a permanent presence beyond Earth, we need to cut that number by 100×.\n\nThe solution has been theorised since Konstantin Tsiolkovsky sketched it in 1895: a tether from Earth\'s equator to a geosynchronous counterweight at 36,000 km. Climber vehicles would ascend at 200 km/h, delivering cargo and crew for $50/kg — cheaper than shipping freight by air today.\n\nThe only thing standing between us and that future is materials science. We need a cable strong enough to support its own weight over 36,000 km. Carbon nanotubes are the only known material that could work.\n\nYou command the programme. Start with what you have: a steel mine, a research lab, and $8.4 billion per year in government funding. Build the supply chain. Fund the science. Deliver the impossible.',
+              title: 'March 2025. The window has opened.',
+              subtitle: 'Space Elevator Program, Phase 0: The Launchpad Problem',
+              body: 'A joint team from MIT and the National Carbon Research Institute just published results that changed everything. Using a new plasma-assisted CVD process, they grew bulk single-wall carbon nanotube yarn achieving 48.3 GPa tensile strength. The theoretical minimum for a geosynchronous tether is around 50 GPa.\n\nFor 30 years, this number sat out of reach. After the 2025 breakthrough, it does not.\n\nThe International Space Elevator Consortium was formed within 90 days. Governments committed $8.4 billion per year in initial funding. The window is open, but it will not stay open. Other nations are watching.\n\nYour mandate: build the supply chain from the ground up, fund the remaining science, and deliver the tether. A space elevator cuts the cost of reaching orbit from $10,000 per kilogram to roughly $50. That single number unlocks the solar system.\n\nStart with what you have: a steel mine, a research lab, and time.',
             },
           ];
         }

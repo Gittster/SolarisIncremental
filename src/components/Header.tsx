@@ -1,6 +1,6 @@
 import { useGameStore } from '../store/gameStore';
 
-export type TabId = 'operations' | 'research';
+export type TabId = 'projects' | 'operations' | 'research';
 
 const PHASE_NAMES: Record<number, string> = {
   0: 'The Launchpad Problem',
@@ -12,6 +12,12 @@ const PHASE_NAMES: Record<number, string> = {
   6: 'Belt Mining',
   7: 'Outer Planets',
   8: 'Interstellar',
+};
+
+const TAB_LABELS: Record<TabId, string> = {
+  projects:   'Projects',
+  operations: 'Operations',
+  research:   'Research',
 };
 
 function formatDate(gameMonth: number): string {
@@ -28,13 +34,9 @@ interface Props {
 }
 
 export function Header({ activeTab, onTabChange }: Props) {
-  const phase = useGameStore(s => s.currentPhase);
+  const phase     = useGameStore(s => s.currentPhase);
   const gameMonth = useGameStore(s => s.gameMonth);
-  const rp = useGameStore(s => s.resources.rp);
-  const unlockedResearch = useGameStore(s => s.unlockedResearch);
-
-  // Show a dot on Research tab when affordable research is available
-  const researchAvailable = false; // computed downstream; simple indicator for now
+  const rp        = useGameStore(s => s.resources.rp);
 
   return (
     <header className="h-14 bg-surface border-b border-border flex items-center px-6 gap-6 shrink-0">
@@ -45,29 +47,29 @@ export function Header({ activeTab, onTabChange }: Props) {
         </span>
         <span className="text-border">·</span>
         <span className="font-body text-text-dim text-xs">
-          Ph.{phase} — {PHASE_NAMES[phase]}
+          Phase {phase} — {PHASE_NAMES[phase]}
         </span>
       </div>
 
       {/* Tab nav */}
       <nav className="flex items-center gap-1 ml-4">
-        {(['operations', 'research'] as TabId[]).map(tab => (
+        {(['projects', 'operations', 'research'] as TabId[]).map(tab => (
           <button
             key={tab}
             onClick={() => onTabChange(tab)}
             className={[
-              'px-4 py-1.5 rounded text-[12px] font-body capitalize transition-all duration-150',
+              'px-4 py-1.5 rounded text-[12px] font-body transition-all duration-150',
               activeTab === tab
                 ? 'bg-primary/10 text-primary border border-primary/30'
                 : 'text-text-dim hover:text-text-secondary hover:bg-surface-raise border border-transparent',
             ].join(' ')}
           >
-            {tab}
+            {TAB_LABELS[tab]}
           </button>
         ))}
       </nav>
 
-      {/* Right side: date + RP */}
+      {/* Right: RP + date */}
       <div className="ml-auto flex items-center gap-4">
         <div className="flex items-center gap-1.5">
           <span className="font-data text-[10px] text-text-dim uppercase tracking-wider">RP</span>
