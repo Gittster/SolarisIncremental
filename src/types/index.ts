@@ -5,14 +5,14 @@ export type ResourceKey =
   | 'carbon'
   | 'aluminum'
   | 'silicon'
-  | 'ree'         // rare earth elements
-  | 'methalox'    // methane/LOX propellant
-  | 'cntCable'    // carbon nanotube cable
+  | 'ree'
+  | 'methalox'
+  | 'cntCable'
   | 'avionics'
   | 'structural'
   | 'solarPanels'
   | 'lifeSupport'
-  | 'rp';         // research points
+  | 'rp';
 
 export type OperationStatus = 'running' | 'mothballed' | 'available' | 'locked';
 
@@ -23,7 +23,6 @@ export interface OperationCount {
 
 export interface ResourceDelta {
   resource: ResourceKey;
-  /** per-year amount (positive = output, negative = input) */
   annualAmount: number;
 }
 
@@ -31,31 +30,48 @@ export interface OperationDef {
   id: string;
   name: string;
   description: string;
+  /** Scientific significance shown on hover */
+  tooltip: string;
   category: 'extraction' | 'manufacturing' | 'rd';
-  /** Annual cost in $M */
   annualCostM: number;
   outputs: ResourceDelta[];
   inputs: ResourceDelta[];
-  /** op ids that must have ≥1 running before this can be built */
+  /** operation ids that must have ≥1 running */
   requires: string[];
-  /** phase that unlocks this operation */
+  /** research id that must be completed before this can be built */
+  requiresResearch?: string;
   unlocksAtPhase: PhaseId;
   maxInstances: number;
 }
 
+export interface ResearchDef {
+  id: string;
+  name: string;
+  description: string;
+  tooltip: string;
+  rpCost: number;
+  /** other research ids that must be completed first */
+  requires: string[];
+  /** operation ids this unlocks */
+  unlocks: string[];
+}
+
+export interface ModalData {
+  id: string;
+  type: 'intro' | 'research' | 'resource';
+  title: string;
+  subtitle?: string;
+  body: string;
+}
+
 export interface GameState {
   currentPhase: PhaseId;
-  /** Game date in months since start (month 0 = Jan 2025) */
   gameMonth: number;
-  /** Date.now() at the last tick */
   lastTick: number;
-
-  /** Annual government appropriation, $M */
   annualBudgetM: number;
-
-  /** How many of each operation are running / mothballed */
   operationCounts: Record<string, OperationCount>;
-
-  /** Resource stockpiles */
   resources: Record<ResourceKey, number>;
+  unlockedResearch: string[];
+  seenIntro: boolean;
+  pendingModals: ModalData[];
 }

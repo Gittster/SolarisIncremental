@@ -1,18 +1,26 @@
+import { useState } from 'react';
 import { GameLoop } from './components/GameLoop';
 import { Header } from './components/Header';
+import type { TabId } from './components/Header';
 import { MilestoneStrip } from './components/MilestoneStrip';
 import { ResourcePanel } from './components/ResourcePanel';
 import { OperationsView } from './components/OperationsView';
+import { ResearchView } from './components/ResearchView';
+import { Modal } from './components/Modal';
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState<TabId>('operations');
+
   return (
     <div className="h-screen bg-bg flex flex-col overflow-hidden font-body">
       <GameLoop />
-      <Header />
+      <Modal />
+      <Header activeTab={activeTab} onTabChange={setActiveTab} />
       <MilestoneStrip />
       <div className="flex flex-1 overflow-hidden">
         <ResourcePanel />
-        <OperationsView />
+        {activeTab === 'operations' && <OperationsView />}
+        {activeTab === 'research'   && <ResearchView />}
       </div>
     </div>
   );

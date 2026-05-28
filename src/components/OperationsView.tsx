@@ -35,7 +35,7 @@ export function OperationsView() {
               </h2>
               <div className="flex-1 h-px bg-border/40" />
             </div>
-            <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-3 items-start">
               {defs.map(def => (
                 <OperationCard key={def.id} def={def} />
               ))}
