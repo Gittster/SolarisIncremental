@@ -1,65 +1,61 @@
 export type PhaseId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
-export type ResourceType = 'energy' | 'materials' | 'rp';
+export type ResourceKey =
+  | 'steel'
+  | 'carbon'
+  | 'aluminum'
+  | 'silicon'
+  | 'ree'         // rare earth elements
+  | 'methalox'    // methane/LOX propellant
+  | 'cntCable'    // carbon nanotube cable
+  | 'avionics'
+  | 'structural'
+  | 'solarPanels'
+  | 'lifeSupport'
+  | 'rp';         // research points
 
-export type AlertLevel = 'none' | 'warning' | 'critical';
+export type OperationStatus = 'running' | 'mothballed' | 'available' | 'locked';
 
-export type CrewRole = 'engineer' | 'scientist' | 'pilot' | 'specialist';
-
-export interface FacilityIO {
-  resource: ResourceType;
-  /** Base rate per second at 100% efficiency. Energy in MW, others in units/s. */
-  rate: number;
+export interface OperationCount {
+  running: number;
+  mothballed: number;
 }
 
-export interface Facility {
+export interface ResourceDelta {
+  resource: ResourceKey;
+  /** per-year amount (positive = output, negative = input) */
+  annualAmount: number;
+}
+
+export interface OperationDef {
   id: string;
   name: string;
   description: string;
-  /** 0–100, recomputed each tick from crew ratio */
-  efficiency: number;
-  inputs: FacilityIO[];
-  outputs: FacilityIO[];
-  crewRequired: number;
-  crewAssigned: number;
-  isActive: boolean;
-  alertLevel: AlertLevel;
-  alertMessage: string;
-}
-
-export interface CrewMember {
-  id: string;
-  name: string;
-  role: CrewRole;
-  /** facility id, or null for standby */
-  assignedTo: string | null;
-}
-
-export interface EnergyState {
-  /** Total MW currently generated across all facilities */
-  generation: number;
-  /** Total MW currently drawn by all facilities */
-  draw: number;
-}
-
-export interface StockpileResource {
-  amount: number;
-  cap: number;
-  /** Net units per second after efficiency; recomputed each tick */
-  rate: number;
+  category: 'extraction' | 'manufacturing' | 'rd';
+  /** Annual cost in $M */
+  annualCostM: number;
+  outputs: ResourceDelta[];
+  inputs: ResourceDelta[];
+  /** op ids that must have ≥1 running before this can be built */
+  requires: string[];
+  /** phase that unlocks this operation */
+  unlocksAtPhase: PhaseId;
+  maxInstances: number;
 }
 
 export interface GameState {
   currentPhase: PhaseId;
-  /** Cumulative in-game seconds elapsed */
-  gameTime: number;
+  /** Game date in months since start (month 0 = Jan 2025) */
+  gameMonth: number;
   /** Date.now() at the last tick */
   lastTick: number;
 
-  energy: EnergyState;
-  materials: StockpileResource;
-  rp: StockpileResource;
+  /** Annual government appropriation, $M */
+  annualBudgetM: number;
 
-  facilities: Facility[];
-  crew: CrewMember[];
+  /** How many of each operation are running / mothballed */
+  operationCounts: Record<string, OperationCount>;
+
+  /** Resource stockpiles */
+  resources: Record<ResourceKey, number>;
 }

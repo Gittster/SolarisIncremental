@@ -1,40 +1,51 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AlertLevel, Facility, GameState } from '../types';
-import { initialGameState } from '../game/initialState';
+import type { GameState, ResourceKey } from '../types';
+import { INITIAL_STATE } from '../game/initialState';
+import { OPERATIONS_BY_ID, OPERATION_DEFS } from '../game/definitions';
 
 interface GameActions {
   tick: (now: number) => void;
-  toggleFacility: (facilityId: string) => void;
-  assignCrew: (crewId: string, facilityId: string | null) => void;
+  buildOperation: (opId: string) => void;
+  mothballOperation: (opId: string) => void;
+  reactivateOperation: (opId: string) => void;
   resetGame: () => void;
 }
 
 export type GameStore = GameState & GameActions;
 
 // ---------------------------------------------------------------------------
-// Pure helpers (no side-effects, no store access)
+// Pure helpers
 // ---------------------------------------------------------------------------
 
-function computeEfficiency(f: Facility): number {
-  if (!f.isActive) return 0;
-  if (f.crewRequired === 0) return 100;
-  if (f.crewAssigned === 0) return 0;
-  return Math.min(100, Math.round((f.crewAssigned / f.crewRequired) * 100));
+function annualCostUsed(counts: GameState['operationCounts']): number {
+  let total = 0;
+  for (const [id, c] of Object.entries(counts)) {
+    const def = OPERATIONS_BY_ID[id];
+    if (def) total += def.annualCostM * c.running;
+  }
+  return total;
 }
 
-function computeAlert(
-  f: Facility,
-  efficiency: number,
-  powerBrownout: boolean,
-): { alertLevel: AlertLevel; alertMessage: string } {
-  if (!f.isActive) return { alertLevel: 'critical', alertMessage: 'Offline' };
-  if (efficiency === 0) return { alertLevel: 'critical', alertMessage: 'No crew assigned' };
-  if (efficiency < 50)  return { alertLevel: 'critical', alertMessage: `Crew: ${f.crewAssigned}/${f.crewRequired}` };
-  if (efficiency < 100) return { alertLevel: 'warning',  alertMessage: `Crew: ${f.crewAssigned}/${f.crewRequired}` };
-  if (powerBrownout && f.inputs.some(i => i.resource === 'energy'))
-    return { alertLevel: 'warning', alertMessage: 'Power constrained' };
-  return { alertLevel: 'none', alertMessage: '' };
+/** Net annual amounts per resource from all running operations */
+function computeAnnualRates(counts: GameState['operationCounts']): Record<ResourceKey, number> {
+  const rates: Record<ResourceKey, number> = {
+    steel: 0, carbon: 0, aluminum: 0, silicon: 0, ree: 0,
+    methalox: 0, cntCable: 0, avionics: 0, structural: 0,
+    solarPanels: 0, lifeSupport: 0, rp: 0,
+  };
+  for (const [id, c] of Object.entries(counts)) {
+    if (c.running === 0) continue;
+    const def = OPERATIONS_BY_ID[id];
+    if (!def) continue;
+    for (const o of def.outputs) {
+      rates[o.resource] += o.annualAmount * c.running;
+    }
+    for (const inp of def.inputs) {
+      rates[inp.resource] -= inp.annualAmount * c.running;
+    }
+  }
+  return rates;
 }
 
 // ---------------------------------------------------------------------------
@@ -44,124 +55,140 @@ function computeAlert(
 export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
-      ...initialGameState,
+      ...INITIAL_STATE,
 
       // ------------------------------------------------------------------
-      // tick — called every ~500 ms by GameLoop
+      // tick — called every ~500 ms. 1 real second = 1 game month.
       // ------------------------------------------------------------------
       tick: (now: number) => {
         const state = get();
-
-        if (state.lastTick === 0) {
-          set({ lastTick: now });
-          return;
-        }
-
-        // Cap delta at 8 hours so returning players aren't flooded
         const deltaMs = Math.min(now - state.lastTick, 8 * 3600 * 1000);
-        const deltaS  = deltaMs / 1000;
+        const deltaYears = deltaMs / 1000 / 12; // 1 real second = 1 game month = 1/12 year
 
-        let totalGeneration = 0;
-        let totalDraw       = 0;
-        let matRate         = 0;
-        let rpRate          = 0;
-
-        // First pass — compute efficiency & aggregate resource flows
-        const pass1 = state.facilities.map(f => {
-          const efficiency = computeEfficiency(f);
-          const eff = efficiency / 100;
-
-          if (f.isActive) {
-            for (const o of f.outputs) {
-              if (o.resource === 'energy')    totalGeneration += o.rate * eff;
-              if (o.resource === 'materials') matRate         += o.rate * eff;
-              if (o.resource === 'rp')        rpRate          += o.rate * eff;
-            }
-            for (const i of f.inputs) {
-              if (i.resource === 'energy') totalDraw += i.rate * eff;
-            }
-          }
-
-          return { ...f, efficiency };
-        });
-
-        // Energy ratio — if < 1 we have a brownout; throttle dependent output
-        const energyRatio = totalDraw > 0
-          ? Math.min(1, totalGeneration / totalDraw)
-          : 1;
-
-        if (energyRatio < 1) {
-          matRate *= energyRatio;
-          rpRate  *= energyRatio;
+        const rates = computeAnnualRates(state.operationCounts);
+        const resources = { ...state.resources };
+        for (const [key, rate] of Object.entries(rates) as [ResourceKey, number][]) {
+          resources[key] = Math.max(0, resources[key] + rate * deltaYears);
         }
 
-        const brownout = energyRatio < 1;
-
-        // Second pass — resolve alerts with brownout knowledge
-        const updatedFacilities = pass1.map(f => {
-          const { alertLevel, alertMessage } = computeAlert(f, f.efficiency, brownout);
-          return { ...f, alertLevel, alertMessage };
-        });
-
+        const deltaMonths = deltaMs / 1000;
         set({
-          lastTick:  now,
-          gameTime:  state.gameTime + deltaS,
-          facilities: updatedFacilities,
-          energy: { generation: totalGeneration, draw: totalDraw },
-          materials: {
-            ...state.materials,
-            rate:   matRate,
-            amount: Math.min(state.materials.cap, state.materials.amount + matRate * deltaS),
-          },
-          rp: {
-            ...state.rp,
-            rate:   rpRate,
-            amount: Math.min(state.rp.cap, state.rp.amount + rpRate * deltaS),
-          },
+          lastTick: now,
+          gameMonth: state.gameMonth + deltaMonths,
+          resources,
         });
       },
 
       // ------------------------------------------------------------------
-      // toggleFacility — activate / deactivate a facility
+      // buildOperation — start one more instance of an operation
       // ------------------------------------------------------------------
-      toggleFacility: (facilityId: string) => {
-        set(state => ({
-          facilities: state.facilities.map(f =>
-            f.id === facilityId ? { ...f, isActive: !f.isActive } : f,
-          ),
-        }));
+      buildOperation: (opId: string) => {
+        const state = get();
+        const def = OPERATIONS_BY_ID[opId];
+        if (!def) return;
+
+        const counts = { ...state.operationCounts };
+        const current = counts[opId] ?? { running: 0, mothballed: 0 };
+        const totalInstances = current.running + current.mothballed;
+        if (totalInstances >= def.maxInstances) return;
+
+        const costUsed = annualCostUsed(counts) + def.annualCostM;
+        if (costUsed > state.annualBudgetM) return;
+
+        counts[opId] = { ...current, running: current.running + 1 };
+        set({ operationCounts: counts });
       },
 
       // ------------------------------------------------------------------
-      // assignCrew — move a crew member to a facility (or to standby)
+      // mothballOperation — suspend one running instance (free, instant)
       // ------------------------------------------------------------------
-      assignCrew: (crewId: string, facilityId: string | null) => {
+      mothballOperation: (opId: string) => {
         set(state => {
-          const crew = state.crew.map(c => {
-            if (c.id !== crewId) return c;
-            return { ...c, assignedTo: facilityId };
-          });
-
-          const member = state.crew.find(c => c.id === crewId);
-          const facilities = state.facilities.map(f => {
-            let count = f.crewAssigned;
-            if (member?.assignedTo === f.id) count--;          // remove from old slot
-            if (facilityId          === f.id) count++;          // add to new slot
-            return { ...f, crewAssigned: Math.max(0, count) };
-          });
-
-          return { crew, facilities };
+          const counts = { ...state.operationCounts };
+          const current = counts[opId];
+          if (!current || current.running === 0) return {};
+          counts[opId] = {
+            running: current.running - 1,
+            mothballed: current.mothballed + 1,
+          };
+          return { operationCounts: counts };
         });
       },
 
       // ------------------------------------------------------------------
-      // resetGame — wipe to initial state (dev utility)
+      // reactivateOperation — bring one mothballed instance back online
       // ------------------------------------------------------------------
-      resetGame: () => set({ ...initialGameState, lastTick: Date.now() }),
+      reactivateOperation: (opId: string) => {
+        set(state => {
+          const counts = { ...state.operationCounts };
+          const current = counts[opId];
+          if (!current || current.mothballed === 0) return {};
+
+          const def = OPERATIONS_BY_ID[opId];
+          if (!def) return {};
+          const costUsed = annualCostUsed(counts) + def.annualCostM;
+          if (costUsed > state.annualBudgetM) return {};
+
+          counts[opId] = {
+            running: current.running + 1,
+            mothballed: current.mothballed - 1,
+          };
+          return { operationCounts: counts };
+        });
+      },
+
+      // ------------------------------------------------------------------
+      resetGame: () => set({ ...INITIAL_STATE, lastTick: Date.now() }),
     }),
     {
-      name:    'solaris-v1',
+      name: 'solaris-v2',
       version: 1,
     },
   ),
 );
+
+// ---------------------------------------------------------------------------
+// Derived selectors (call outside store to avoid stale closure)
+// ---------------------------------------------------------------------------
+
+export function selectBudgetUsed(state: GameState): number {
+  return annualCostUsed(state.operationCounts);
+}
+
+export function selectAnnualRates(state: GameState): Record<ResourceKey, number> {
+  return computeAnnualRates(state.operationCounts);
+}
+
+export function selectCanBuild(state: GameState, opId: string): boolean {
+  const def = OPERATIONS_BY_ID[opId];
+  if (!def) return false;
+  if (def.unlocksAtPhase > state.currentPhase) return false;
+
+  const counts = state.operationCounts;
+  const current = counts[opId] ?? { running: 0, mothballed: 0 };
+  if (current.running + current.mothballed >= def.maxInstances) return false;
+
+  const costAfter = annualCostUsed(counts) + def.annualCostM;
+  if (costAfter > state.annualBudgetM) return false;
+
+  for (const reqId of def.requires) {
+    const req = counts[reqId];
+    if (!req || req.running === 0) return false;
+  }
+  return true;
+}
+
+export function selectOperationStatus(state: GameState, opId: string) {
+  const def = OPERATIONS_BY_ID[opId];
+  if (!def) return 'locked' as const;
+  if (def.unlocksAtPhase > state.currentPhase) return 'locked' as const;
+
+  const counts = state.operationCounts[opId] ?? { running: 0, mothballed: 0 };
+  if (counts.running > 0) return 'running' as const;
+  if (counts.mothballed > 0) return 'mothballed' as const;
+  return 'available' as const;
+}
+
+export function selectAllOperationDefs() {
+  return OPERATION_DEFS;
+}
