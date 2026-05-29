@@ -14,11 +14,13 @@ export type ResourceKey =
   | 'lifeSupport'
   | 'rp';
 
-export type OperationStatus = 'running' | 'mothballed' | 'available' | 'locked';
+export type OperationStatus = 'active' | 'idle' | 'available' | 'locked';
 
 export interface OperationCount {
-  running: number;
-  mothballed: number;
+  /** Total units constructed (paid for with materials) */
+  built: number;
+  /** Units currently running and consuming annual budget */
+  active: number;
 }
 
 export interface ResourceDelta {
@@ -26,19 +28,25 @@ export interface ResourceDelta {
   annualAmount: number;
 }
 
+/** One-time material cost to construct one unit of an operation */
+export interface BuildCost {
+  resource: ResourceKey;
+  amount: number;
+}
+
 export interface OperationDef {
   id: string;
   name: string;
   description: string;
-  /** Scientific significance shown on hover */
   tooltip: string;
   category: 'extraction' | 'manufacturing' | 'rd';
+  /** Annual operating cost per active unit, $M */
   annualCostM: number;
+  /** One-time material cost to construct one unit */
+  buildCost: BuildCost[];
   outputs: ResourceDelta[];
   inputs: ResourceDelta[];
-  /** operation ids that must have ≥1 running */
   requires: string[];
-  /** research id that must be completed before this can be built */
   requiresResearch?: string;
   unlocksAtPhase: PhaseId;
   maxInstances: number;
@@ -50,9 +58,7 @@ export interface ResearchDef {
   description: string;
   tooltip: string;
   rpCost: number;
-  /** other research ids that must be completed first */
   requires: string[];
-  /** operation ids this unlocks */
   unlocks: string[];
 }
 

@@ -103,6 +103,8 @@ export const RESEARCH_BY_ID = Object.fromEntries(
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Operations
+// buildCost = one-time material cost to construct one unit
+// annualCostM = ongoing cost per year per active unit
 // ──────────────────────────────────────────────────────────────────────────────
 
 export const OPERATION_DEFS: OperationDef[] = [
@@ -114,6 +116,7 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'Modern BOF steelmaking converts a 300-tonne heat of iron in 40 minutes. Electric arc furnaces (EAF) can recycle scrap at 400-700 kWh per tonne. The Space Elevator tether anchor and ground station alone will require roughly 50,000 tonnes of high-grade structural steel with tightly controlled carbon content.',
     category: 'extraction',
     annualCostM: 420,
+    buildCost: [{ resource: 'steel', amount: 4000 }],
     outputs: [{ resource: 'steel', annualAmount: 12000 }],
     inputs: [],
     requires: [],
@@ -127,6 +130,7 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'Carbon fiber production begins with stretching and oxidizing PAN fibers at 200-300 degrees C, then carbonizing at 1000-1500 degrees C in nitrogen. The resulting T800-grade fiber (5,880 MPa, 294 GPa modulus) is 70% lighter than steel per unit strength. Global capacity is roughly 180,000 tonnes per year, a bottleneck for space construction programs.',
     category: 'extraction',
     annualCostM: 380,
+    buildCost: [{ resource: 'steel', amount: 3000 }],
     outputs: [{ resource: 'carbon', annualAmount: 4800 }],
     inputs: [],
     requires: [],
@@ -141,6 +145,7 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'A typical smelter contains 300-500 electrolytic cells, each drawing 150-350 kA at 4-5 V. The molten cryolite bath (Na3AlF6) at 960 degrees C dissolves alumina, which is reduced at the carbon cathode. Each tonne of aluminum requires roughly 14,000 kWh of electricity, making smelters among the largest industrial electricity consumers globally.',
     category: 'extraction',
     annualCostM: 350,
+    buildCost: [{ resource: 'steel', amount: 5000 }],
     outputs: [{ resource: 'aluminum', annualAmount: 8000 }],
     inputs: [],
     requires: [],
@@ -155,6 +160,10 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'Starting from quartz sand (SiO2), silicon is reduced with coke in an electric arc furnace to 98% metallurgical grade, then purified via the Siemens process (CVD at 1100 degrees C using trichlorosilane) to 9N purity. Czochralski boules are sliced into 300 mm wafers using diamond wire saws with 80 micrometer kerf.',
     category: 'extraction',
     annualCostM: 300,
+    buildCost: [
+      { resource: 'steel',    amount: 2000 },
+      { resource: 'aluminum', amount: 1000 },
+    ],
     outputs: [{ resource: 'silicon', annualAmount: 2400 }],
     inputs: [],
     requires: [],
@@ -169,6 +178,10 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'REE separation exploits the 0.2 angstrom variation in ionic radius across the lanthanide series. HDEHP solvent extraction runs through 20-50 mixer-settler stages to achieve 99.9% purity per element. Residual thorium and uranium from ore processing require licensed radioactive waste management.',
     category: 'extraction',
     annualCostM: 500,
+    buildCost: [
+      { resource: 'steel',    amount: 3000 },
+      { resource: 'aluminum', amount: 1000 },
+    ],
     outputs: [{ resource: 'ree', annualAmount: 600 }],
     inputs: [],
     requires: [],
@@ -183,6 +196,10 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'Liquid methane (LCH4, boiling point -161 degrees C) and liquid oxygen (LOX, boiling point -183 degrees C) are stored in vacuum-jacketed cryogenic tanks. The mixture\'s specific impulse of 380 s (vacuum) is lower than hydrogen/LOX (450 s), but methane\'s higher density and the ability to synthesize it on Mars via CO2 plus H2 makes it the propellant of choice for reusable deep-space vehicles.',
     category: 'extraction',
     annualCostM: 460,
+    buildCost: [
+      { resource: 'steel',    amount: 2000 },
+      { resource: 'aluminum', amount: 1000 },
+    ],
     outputs: [{ resource: 'methalox', annualAmount: 24000 }],
     inputs: [],
     requires: [],
@@ -199,10 +216,14 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'A Space Elevator tether must support its own weight over 36,000 km while a climber vehicle ascends at 200 km/h. The required cross-sectional tapering yields a taper ratio of roughly 10 for 100 GPa material. Current best CNT yarn achieves roughly 10 GPa; we are producing near-specification cable for the first time in history.',
     category: 'manufacturing',
     annualCostM: 840,
+    buildCost: [
+      { resource: 'structural', amount: 1500 },
+      { resource: 'avionics',   amount: 200  },
+    ],
     outputs: [{ resource: 'cntCable', annualAmount: 120 }],
     inputs: [
       { resource: 'carbon', annualAmount: 2400 },
-      { resource: 'ree',    annualAmount: 200 },
+      { resource: 'ree',    annualAmount: 200  },
     ],
     requires: ['carbon_extractor', 'ree_mine'],
     requiresResearch: 'cnt_synthesis',
@@ -216,10 +237,15 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'Climber vehicles traverse the Van Allen belts multiple times per trip, accumulating roughly 10 krad(Si) TID per ascent/descent cycle. RHBD ASICs with TMR processing boards add roughly 40 kg per vehicle but are mandatory above 2,000 km altitude. The avionics suite also includes redundant LIDAR for cable tracking and autonomous fault response.',
     category: 'manufacturing',
     annualCostM: 620,
+    buildCost: [
+      { resource: 'steel',    amount: 2000 },
+      { resource: 'aluminum', amount: 1000 },
+      { resource: 'silicon',  amount: 300  },
+    ],
     outputs: [{ resource: 'avionics', annualAmount: 240 }],
     inputs: [
       { resource: 'silicon', annualAmount: 1200 },
-      { resource: 'ree',     annualAmount: 100 },
+      { resource: 'ree',     annualAmount: 100  },
     ],
     requires: ['silicon_refinery', 'ree_mine'],
     requiresResearch: 'precision_electronics',
@@ -233,6 +259,10 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'The Earth anchor station must absorb 10 million tonnes of horizontal tether force while resisting seismic loads and storm surge at the equatorial ocean platform site. The geosynchronous counterweight is a 600,000-tonne structure assembled in orbit from pre-launched modules, the largest structure humanity has ever built.',
     category: 'manufacturing',
     annualCostM: 560,
+    buildCost: [
+      { resource: 'steel',    amount: 3000 },
+      { resource: 'aluminum', amount: 2000 },
+    ],
     outputs: [{ resource: 'structural', annualAmount: 1800 }],
     inputs: [
       { resource: 'steel',    annualAmount: 6000 },
@@ -250,6 +280,10 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'Space solar panels generate roughly 270 W per square meter (AM0) vs roughly 200 W for terrestrial panels. Each panel is tested in a solar simulator (Xe arc lamp, 1 AU spectrum) before launch. The anchor station\'s 500 MW requirement means roughly 1.85 square kilometers of panel area, assembled robotically in GEO over a 3-year construction window.',
     category: 'manufacturing',
     annualCostM: 480,
+    buildCost: [
+      { resource: 'aluminum', amount: 1500 },
+      { resource: 'silicon',  amount: 400  },
+    ],
     outputs: [{ resource: 'solarPanels', annualAmount: 360 }],
     inputs: [
       { resource: 'silicon',  annualAmount: 800 },
@@ -267,10 +301,14 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'The anchor station crews of 12-24 people require 2 kg per day of food, 2.5 liters per day of water, and 0.84 kg per day of oxygen per person. Without recycling, annual resupply would cost roughly $800 million at GEO altitude. Closed-loop life support reduces consumable delivery to under 50 kg per person per year, making permanent habitation economically viable.',
     category: 'manufacturing',
     annualCostM: 700,
+    buildCost: [
+      { resource: 'structural', amount: 2000 },
+      { resource: 'avionics',   amount: 300  },
+    ],
     outputs: [{ resource: 'lifeSupport', annualAmount: 180 }],
     inputs: [
       { resource: 'aluminum',   annualAmount: 1000 },
-      { resource: 'structural', annualAmount: 400 },
+      { resource: 'structural', annualAmount: 400  },
     ],
     requires: ['structural_fab'],
     requiresResearch: 'life_support_tech',
@@ -286,6 +324,7 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'Fundamental space elevator research typically costs $2-5 million per researcher-year at national labs. DARPA\'s ISAAC program and ESA\'s Clean Space initiative have co-funded early-stage CNT cable research since 2008. Each lab generates roughly 4 publications per year, each cited an average of 12 times.',
     category: 'rd',
     annualCostM: 320,
+    buildCost: [{ resource: 'steel', amount: 1500 }],
     outputs: [{ resource: 'rp', annualAmount: 1200 }],
     inputs: [],
     requires: [],
@@ -299,6 +338,11 @@ export const OPERATION_DEFS: OperationDef[] = [
     tooltip: 'Advanced campuses co-locate computational materials science (high-performance GPU clusters for DFT/MD simulation) with experimental synthesis labs and characterization suites (TEM, XPS, nanoindentation). This reduces the iteration cycle from months to days. MIT\'s Research Laboratory of Electronics is the archetype: 800 researchers, $120 million per year budget.',
     category: 'rd',
     annualCostM: 680,
+    buildCost: [
+      { resource: 'steel',     amount: 2000 },
+      { resource: 'aluminum',  amount: 1000 },
+      { resource: 'structural', amount: 300 },
+    ],
     outputs: [{ resource: 'rp', annualAmount: 3600 }],
     inputs: [],
     requires: ['research_lab'],

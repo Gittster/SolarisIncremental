@@ -12,8 +12,8 @@ export const INITIAL_STATE: GameState = {
   lastTick: Date.now(),
   annualBudgetM: 8400,
   operationCounts: {
-    steel_mine:   { running: 1, mothballed: 0 },
-    research_lab: { running: 1, mothballed: 0 },
+    steel_mine:   { built: 1, active: 1 },
+    research_lab: { built: 1, active: 1 },
   },
   resources: { ...ZERO_RESOURCES, steel: 1200, rp: 120 },
   unlockedResearch: [],

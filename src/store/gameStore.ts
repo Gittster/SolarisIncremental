@@ -7,8 +7,8 @@ import { OPERATIONS_BY_ID, OPERATION_DEFS, RESEARCH_BY_ID, RESEARCH_DEFS } from 
 interface GameActions {
   tick: (now: number) => void;
   buildOperation: (opId: string) => void;
-  mothballOperation: (opId: string) => void;
-  reactivateOperation: (opId: string) => void;
+  incrementActive: (opId: string) => void;
+  decrementActive: (opId: string) => void;
   purchaseResearch: (researchId: string) => void;
   dismissModal: () => void;
   markIntroSeen: () => void;
@@ -25,7 +25,7 @@ function annualCostUsed(counts: GameState['operationCounts']): number {
   let total = 0;
   for (const [id, c] of Object.entries(counts)) {
     const def = OPERATIONS_BY_ID[id];
-    if (def) total += def.annualCostM * c.running;
+    if (def) total += def.annualCostM * c.active;
   }
   return total;
 }
@@ -37,19 +37,18 @@ function computeAnnualRates(counts: GameState['operationCounts']): Record<Resour
     solarPanels: 0, lifeSupport: 0, rp: 0,
   };
   for (const [id, c] of Object.entries(counts)) {
-    if (c.running === 0) continue;
+    if (c.active === 0) continue;
     const def = OPERATIONS_BY_ID[id];
     if (!def) continue;
-    for (const o of def.outputs) rates[o.resource] += o.annualAmount * c.running;
-    for (const inp of def.inputs) rates[inp.resource] -= inp.annualAmount * c.running;
+    for (const o of def.outputs) rates[o.resource] += o.annualAmount * c.active;
+    for (const inp of def.inputs)  rates[inp.resource] -= inp.annualAmount * c.active;
   }
   return rates;
 }
 
-function researchIsUnlocked(researchId: string, unlockedResearch: string[]): boolean {
+function researchPrereqsMet(researchId: string, unlocked: string[]): boolean {
   const def = RESEARCH_BY_ID[researchId];
-  if (!def) return false;
-  return def.requires.every(req => unlockedResearch.includes(req));
+  return !def ? false : def.requires.every(r => unlocked.includes(r));
 }
 
 // ---------------------------------------------------------------------------
@@ -63,13 +62,13 @@ export const useGameStore = create<GameStore>()(
 
       tick: (now: number) => {
         const state = get();
-        const deltaMs = Math.min(now - state.lastTick, 8 * 3600 * 1000);
-        const deltaYears = deltaMs / 1000 / 12;
+        const deltaMs  = Math.min(now - state.lastTick, 8 * 3600 * 1000);
+        const deltaYrs = deltaMs / 1000 / 12; // 1 real second = 1 game month = 1/12 year
 
         const rates = computeAnnualRates(state.operationCounts);
         const resources = { ...state.resources };
         for (const [key, rate] of Object.entries(rates) as [ResourceKey, number][]) {
-          resources[key] = Math.max(0, resources[key] + rate * deltaYears);
+          resources[key] = Math.max(0, resources[key] + rate * deltaYrs);
         }
 
         const updates: Partial<GameState> = {
@@ -78,7 +77,6 @@ export const useGameStore = create<GameStore>()(
           resources,
         };
 
-        // Trigger intro modal on first tick
         if (!state.seenIntro) {
           updates.seenIntro = true;
           updates.pendingModals = [
@@ -96,43 +94,48 @@ export const useGameStore = create<GameStore>()(
         set(updates);
       },
 
+      // Pay material build cost, add 1 to both built and active
       buildOperation: (opId: string) => {
         const state = get();
+        if (!selectCanBuild(state, opId)) return;
+
         const def = OPERATIONS_BY_ID[opId];
         if (!def) return;
 
-        const counts = { ...state.operationCounts };
-        const current = counts[opId] ?? { running: 0, mothballed: 0 };
-        if (current.running + current.mothballed >= def.maxInstances) return;
-        if (annualCostUsed(counts) + def.annualCostM > state.annualBudgetM) return;
-        if (def.requiresResearch && !state.unlockedResearch.includes(def.requiresResearch)) return;
-        for (const reqId of def.requires) {
-          if ((counts[reqId]?.running ?? 0) === 0) return;
+        // Deduct build cost materials
+        const resources = { ...state.resources };
+        for (const cost of def.buildCost) {
+          resources[cost.resource] = (resources[cost.resource] ?? 0) - cost.amount;
         }
 
-        counts[opId] = { ...current, running: current.running + 1 };
-        set({ operationCounts: counts });
+        const counts = { ...state.operationCounts };
+        const current = counts[opId] ?? { built: 0, active: 0 };
+        counts[opId] = { built: current.built + 1, active: current.active + 1 };
+
+        set({ operationCounts: counts, resources });
       },
 
-      mothballOperation: (opId: string) => {
+      // Activate one more idle unit (no material cost, just budget check)
+      incrementActive: (opId: string) => {
         set(state => {
           const counts = { ...state.operationCounts };
           const current = counts[opId];
-          if (!current || current.running === 0) return {};
-          counts[opId] = { running: current.running - 1, mothballed: current.mothballed + 1 };
+          if (!current || current.active >= current.built) return {};
+          const def = OPERATIONS_BY_ID[opId];
+          if (!def) return {};
+          if (annualCostUsed(counts) + def.annualCostM > state.annualBudgetM) return {};
+          counts[opId] = { ...current, active: current.active + 1 };
           return { operationCounts: counts };
         });
       },
 
-      reactivateOperation: (opId: string) => {
+      // Deactivate one running unit (always allowed, frees budget)
+      decrementActive: (opId: string) => {
         set(state => {
           const counts = { ...state.operationCounts };
           const current = counts[opId];
-          if (!current || current.mothballed === 0) return {};
-          const def = OPERATIONS_BY_ID[opId];
-          if (!def) return {};
-          if (annualCostUsed(counts) + def.annualCostM > state.annualBudgetM) return {};
-          counts[opId] = { running: current.running + 1, mothballed: current.mothballed - 1 };
+          if (!current || current.active === 0) return {};
+          counts[opId] = { ...current, active: current.active - 1 };
           return { operationCounts: counts };
         });
       },
@@ -142,7 +145,7 @@ export const useGameStore = create<GameStore>()(
         const def = RESEARCH_BY_ID[researchId];
         if (!def) return;
         if (state.unlockedResearch.includes(researchId)) return;
-        if (!researchIsUnlocked(researchId, state.unlockedResearch)) return;
+        if (!researchPrereqsMet(researchId, state.unlockedResearch)) return;
         if (state.resources.rp < def.rpCost) return;
 
         const modal: ModalData = {
@@ -155,22 +158,20 @@ export const useGameStore = create<GameStore>()(
             : ''),
         };
 
-        set(state => ({
-          resources: { ...state.resources, rp: state.resources.rp - def.rpCost },
-          unlockedResearch: [...state.unlockedResearch, researchId],
-          pendingModals: [...state.pendingModals, modal],
+        set(s => ({
+          resources: { ...s.resources, rp: s.resources.rp - def.rpCost },
+          unlockedResearch: [...s.unlockedResearch, researchId],
+          pendingModals: [...s.pendingModals, modal],
         }));
       },
 
-      dismissModal: () => {
-        set(state => ({ pendingModals: state.pendingModals.slice(1) }));
-      },
+      dismissModal: () => set(s => ({ pendingModals: s.pendingModals.slice(1) })),
 
       markIntroSeen: () => set({ seenIntro: true }),
 
       resetGame: () => set({ ...INITIAL_STATE, lastTick: Date.now() }),
     }),
-    { name: 'solaris-v3', version: 1 },
+    { name: 'solaris-v4', version: 1 },
   ),
 );
 
@@ -186,19 +187,37 @@ export function selectAnnualRates(state: GameState): Record<ResourceKey, number>
   return computeAnnualRates(state.operationCounts);
 }
 
+/** True if the player can pay material cost and has budget for +1 active unit */
 export function selectCanBuild(state: GameState, opId: string): boolean {
   const def = OPERATIONS_BY_ID[opId];
   if (!def) return false;
   if (def.unlocksAtPhase > state.currentPhase) return false;
   if (def.requiresResearch && !state.unlockedResearch.includes(def.requiresResearch)) return false;
+
   const counts = state.operationCounts;
-  const current = counts[opId] ?? { running: 0, mothballed: 0 };
-  if (current.running + current.mothballed >= def.maxInstances) return false;
+  const current = counts[opId] ?? { built: 0, active: 0 };
+  if (current.built >= def.maxInstances) return false;
+  // New unit starts active — check budget
   if (annualCostUsed(counts) + def.annualCostM > state.annualBudgetM) return false;
+  // Check op prerequisites
   for (const reqId of def.requires) {
-    if ((counts[reqId]?.running ?? 0) === 0) return false;
+    if ((counts[reqId]?.active ?? 0) === 0) return false;
+  }
+  // Check material build cost
+  for (const cost of def.buildCost) {
+    if ((state.resources[cost.resource] ?? 0) < cost.amount) return false;
   }
   return true;
+}
+
+/** True if an idle built unit can be activated (budget check only) */
+export function selectCanActivate(state: GameState, opId: string): boolean {
+  const def = OPERATIONS_BY_ID[opId];
+  if (!def) return false;
+  const counts = state.operationCounts;
+  const current = counts[opId] ?? { built: 0, active: 0 };
+  if (current.active >= current.built) return false;
+  return annualCostUsed(counts) + def.annualCostM <= state.annualBudgetM;
 }
 
 export function selectOperationStatus(state: GameState, opId: string) {
@@ -206,9 +225,9 @@ export function selectOperationStatus(state: GameState, opId: string) {
   if (!def) return 'locked' as const;
   if (def.unlocksAtPhase > state.currentPhase) return 'locked' as const;
   if (def.requiresResearch && !state.unlockedResearch.includes(def.requiresResearch)) return 'locked' as const;
-  const counts = state.operationCounts[opId] ?? { running: 0, mothballed: 0 };
-  if (counts.running > 0) return 'running' as const;
-  if (counts.mothballed > 0) return 'mothballed' as const;
+  const counts = state.operationCounts[opId] ?? { built: 0, active: 0 };
+  if (counts.active > 0) return 'active' as const;
+  if (counts.built > 0)  return 'idle' as const;
   return 'available' as const;
 }
 
@@ -216,7 +235,7 @@ export function selectCanPurchaseResearch(state: GameState, researchId: string):
   const def = RESEARCH_BY_ID[researchId];
   if (!def) return false;
   if (state.unlockedResearch.includes(researchId)) return false;
-  if (!researchIsUnlocked(researchId, state.unlockedResearch)) return false;
+  if (!researchPrereqsMet(researchId, state.unlockedResearch)) return false;
   return state.resources.rp >= def.rpCost;
 }
 
